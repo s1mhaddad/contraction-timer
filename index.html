@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f14">
+<title>Contraction Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f14;
+    --bg2: #1a1a24;
+    --bg3: #22222f;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f5;
+    --muted: rgba(240,240,245,0.45);
+    --hint: rgba(240,240,245,0.25);
+    --pink: #e8739a;
+    --pink-bg: rgba(232,115,154,0.12);
+    --pink-border: rgba(232,115,154,0.3);
+    --green: #5ec99a;
+    --green-bg: rgba(94,201,154,0.1);
+    --amber: #f0c04a;
+    --amber-bg: rgba(240,192,74,0.12);
+    --amber-border: rgba(240,192,74,0.35);
+    --red: #e05c5c;
+    --red-bg: rgba(224,92,92,0.12);
+    --red-border: rgba(224,92,92,0.35);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); font-family: var(--font); color: var(--text); overscroll-behavior: none; }
+
+  #app { min-height: 100vh; display: flex; flex-direction: column; max-width: 430px; margin: 0 auto; padding: 0; }
+
+  /* HEADER */
+  header { padding: 20px 24px 0; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0.02em; }
+  #darkToggle {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 20px;
+    padding: 6px 14px; font-size: 12px; color: var(--muted); cursor: pointer; font-family: var(--font);
+    transition: all 0.2s;
+  }
+  #darkToggle:hover { color: var(--text); border-color: var(--border2); }
+
+  /* SESSION TIMER */
+  #sessionBar { padding: 12px 24px 0; }
+  #sessionInfo { font-size: 12px; color: var(--hint); font-family: var(--mono); }
+
+  /* MAIN TAP AREA */
+  #tapArea {
+    flex: 0 0 auto; padding: 20px 24px 16px; display: flex; flex-direction: column; align-items: center;
+  }
+  #tapBtn {
+    width: 100%; min-height: 200px; border-radius: 28px;
+    border: 1.5px solid var(--border2);
+    background: var(--bg2);
+    cursor: pointer; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    transition: background 0.2s, border-color 0.2s, transform 0.08s;
+    user-select: none; -webkit-user-select: none;
+    position: relative; overflow: hidden;
+  }
+  #tapBtn.active {
+    background: var(--pink-bg);
+    border-color: var(--pink-border);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  #tapBtn:active { transform: scale(0.985); }
+  @keyframes pulse {
+    0%, 100% { border-color: var(--pink-border); }
+    50% { border-color: var(--pink); }
+  }
+  #tapBtn .ripple {
+    position: absolute; border-radius: 50%;
+    background: rgba(232,115,154,0.15);
+    transform: scale(0); animation: rippleAnim 0.5s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes rippleAnim {
+    to { transform: scale(4); opacity: 0; }
+  }
+  #btnMain { font-size: 28px; font-weight: 500; color: var(--text); transition: color 0.2s; }
+  #tapBtn.active #btnMain { color: var(--pink); }
+  #btnLive { font-family: var(--mono); font-size: 48px; font-weight: 400; color: var(--pink); display: none; }
+  #btnSub { font-size: 13px; color: var(--muted); font-weight: 300; }
+  #tapBtn.active #btnSub { color: rgba(232,115,154,0.7); }
+
+  /* UNDO */
+  #undoBtn {
+    margin-top: 10px; background: none; border: 1px solid var(--border);
+    border-radius: 20px; padding: 7px 18px; font-size: 13px; color: var(--muted);
+    cursor: pointer; font-family: var(--font); transition: all 0.2s; display: none;
+  }
+  #undoBtn:hover { border-color: var(--border2); color: var(--text); }
+
+  /* STATS */
+  #statsGrid { padding: 0 24px 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 14px 12px;
+  }
+  .stat-label { font-size: 11px; color: var(--hint); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px; }
+  .stat-val { font-family: var(--mono); font-size: 20px; font-weight: 500; color: var(--text); }
+  .stat-val.dim { color: var(--muted); }
+
+  /* 5-1-1 ALERT */
+  #alert511 {
+    margin: 0 24px 14px; padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--amber-bg); border: 1px solid var(--amber-border);
+    display: none;
+  }
+  #alert511 .alert-title { font-size: 14px; font-weight: 500; color: var(--amber); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  #alert511 .alert-body { font-size: 13px; color: rgba(240,192,74,0.75); line-height: 1.5; }
+
+  /* PHASE */
+  #phaseBar {
+    margin: 0 24px 14px; padding: 11px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--bg2); border: 1px solid var(--border);
+    font-size: 13px; color: var(--muted);
+    display: none; align-items: center; gap: 8px;
+  }
+  #phaseDot { width: 8px; height: 8px; border-radius: 50%; background: var(--hint); flex-shrink: 0; }
+
+  /* BREATHING GUIDE */
+  #breatheBar {
+    margin: 0 24px 14px; padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--pink-bg); border: 1px solid var(--pink-border);
+    display: none; align-items: center; gap: 12px;
+  }
+  #breatheText { font-size: 14px; color: var(--pink); font-weight: 500; }
+  #breatheSub { font-size: 12px; color: rgba(232,115,154,0.6); margin-top: 2px; }
+  #breatheCircle {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 2px solid var(--pink); flex-shrink: 0;
+    animation: breatheAnim 4s ease-in-out infinite;
+  }
+  @keyframes breatheAnim {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.3); opacity: 1; }
+  }
+
+  /* LOG */
+  #logSection { padding: 0 24px 40px; flex: 1; }
+  #logHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  #logHeader h2 { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+  #clearBtn {
+    background: none; border: none; font-size: 12px; color: var(--hint);
+    cursor: pointer; font-family: var(--font); padding: 4px 0; transition: color 0.2s;
+  }
+  #clearBtn:hover { color: var(--red); }
+
+  .log-cols {
+    display: grid; grid-template-columns: 26px 1fr 80px 80px;
+    gap: 6px; padding: 0 4px 8px; margin-bottom: 4px;
+  }
+  .log-cols span { font-size: 11px; color: var(--hint); letter-spacing: 0.04em; }
+  .log-cols span:last-child, .log-cols span:nth-child(3) { text-align: right; }
+
+  .log-row {
+    display: grid; grid-template-columns: 26px 1fr 80px 80px;
+    gap: 6px; align-items: center; padding: 11px 4px;
+    border-top: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .log-row:hover { background: var(--bg2); border-radius: var(--radius-sm); }
+  .log-num { font-size: 12px; color: var(--hint); font-family: var(--mono); }
+  .log-time { font-size: 13px; color: var(--muted); font-family: var(--mono); }
+  .log-dur, .log-int { font-size: 13px; font-family: var(--mono); font-weight: 500; color: var(--text); text-align: right; }
+  .log-int.dim { color: var(--hint); }
+  .log-dur.warn { color: var(--green); }
+  .log-int.close { color: var(--amber); }
+
+  #empty { text-align: center; padding: 40px 0 20px; color: var(--hint); font-size: 14px; line-height: 1.7; }
+
+  /* LIGHT MODE */
+  body.light {
+    --bg: #fafaf8; --bg2: #f2f2ef; --bg3: #e8e8e4;
+    --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+    --text: #1a1a22; --muted: rgba(26,26,34,0.5); --hint: rgba(26,26,34,0.3);
+    --pink-bg: rgba(210,80,130,0.07); --pink-border: rgba(210,80,130,0.25);
+    --pink: #c04878; --green: #2a9e6a; --amber: #b07e10;
+    --amber-bg: rgba(176,126,16,0.08); --amber-border: rgba(176,126,16,0.3);
+  }
+
+  /* EXPORT MODAL */
+  #exportOverlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 100;
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  #exportOverlay.show { display: flex; }
+  #exportBox {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 24px; width: 100%; max-width: 380px;
+  }
+  #exportBox h3 { font-size: 16px; font-weight: 500; margin-bottom: 8px; }
+  #exportBox p { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  #exportText {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px; font-family: var(--mono);
+    font-size: 12px; color: var(--text); resize: none; height: 160px; line-height: 1.6;
+  }
+  #exportActions { display: flex; gap: 10px; margin-top: 14px; }
+  #copyBtn, #closeExport {
+    flex: 1; padding: 11px; border-radius: var(--radius-sm);
+    font-size: 14px; cursor: pointer; font-family: var(--font); font-weight: 500;
+    transition: opacity 0.2s;
+  }
+  #copyBtn { background: var(--pink); border: none; color: white; }
+  #closeExport { background: none; border: 1px solid var(--border2); color: var(--muted); }
+  #copyBtn:hover, #closeExport:hover { opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <header>
+    <h1>Contraction timer</h1>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="exportBtnTop" onclick="openExport()" style="background:none;border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--muted);cursor:pointer;font-family:var(--font);transition:all 0.2s;" title="Export for midwife">Export</button>
+      <button id="darkToggle" onclick="toggleLight()">Light</button>
+    </div>
+  </header>
+
+  <div id="sessionBar">
+    <div id="sessionInfo">Session: 0:00 &nbsp;|&nbsp; 0 contractions</div>
+  </div>
+
+  <div id="tapArea">
+    <button id="tapBtn" onclick="handleTap(event)" ontouchstart="handleTap(event)">
+      <div id="btnLive">0s</div>
+      <div id="btnMain">Tap to start</div>
+      <div id="btnSub">tap when a contraction begins</div>
+    </button>
+    <button id="undoBtn" onclick="undoLast()">&#8630; Undo last</button>
+  </div>
+
+  <div id="statsGrid">
+    <div class="stat-card">
+      <div class="stat-label">Last duration</div>
+      <div class="stat-val dim" id="lastDur">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last interval</div>
+      <div class="stat-val dim" id="lastInt">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg duration</div>
+      <div class="stat-val dim" id="avgDur">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg interval</div>
+      <div class="stat-val dim" id="avgInt">—</div>
+    </div>
+  </div>
+
+  <div id="phaseBar">
+    <div id="phaseDot"></div>
+    <div>
+      <div id="phaseText" style="font-size:13px;color:var(--text);font-weight:500;"></div>
+      <div id="phaseSub" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+    </div>
+  </div>
+
+  <div id="breatheBar">
+    <div id="breatheCircle"></div>
+    <div>
+      <div id="breatheText">Breathe through it</div>
+      <div id="breatheSub">slow breath in... slow breath out</div>
+    </div>
+  </div>
+
+  <div id="alert511">
+    <div class="alert-title">&#9888; 5-1-1 pattern detected</div>
+    <div class="alert-body">Contractions every ~5 min, lasting ~1 min, for over an hour. Consider calling your midwife or heading to hospital. Always follow your care provider's guidance.</div>
+  </div>
+
+  <div id="logSection">
+    <div id="logHeader">
+      <h2>History <span id="cCount" style="font-weight:400;opacity:0.6;"></span></h2>
+      <button id="clearBtn" onclick="clearAll()">Clear all</button>
+    </div>
+    <div class="log-cols">
+      <span>#</span><span>Time</span><span style="text-align:right">Duration</span><span style="text-align:right">Interval</span>
+    </div>
+    <div id="logList">
+      <div id="empty">No contractions yet.<br>Tap the button above when one starts.</div>
+    </div>
+  </div>
+
+</div>
+
+<div id="exportOverlay">
+  <div id="exportBox">
+    <h3>Export for midwife</h3>
+    <p>Copy this summary to send to your care team or read over the phone.</p>
+    <textarea id="exportText" readonly></textarea>
+    <div id="exportActions">
+      <button id="copyBtn" onclick="copyExport()">Copy to clipboard</button>
+      <button id="closeExport" onclick="closeExportModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let contractions = [];
+let activeStart = null;
+let liveTimer = null;
+let sessionTimer = null;
+let sessionStart = null;
+let elapsed = 0;
+
+function loadSaved() {
+  try {
+    const saved = localStorage.getItem('contractions_v2');
+    if (saved) contractions = JSON.parse(saved);
+    const ss = localStorage.getItem('session_start');
+    if (ss) sessionStart = parseInt(ss);
+  } catch(e) {}
+}
+
+function save() {
+  try {
+    localStorage.setItem('contractions_v2', JSON.stringify(contractions));
+    if (sessionStart) localStorage.setItem('session_start', sessionStart);
+  } catch(e) {}
+}
+
+function fmt(ms) {
+  if (ms == null || isNaN(ms) || ms <= 0) return '—';
+  const s = Math.round(ms / 1000);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m > 0 ? m + 'm ' + String(sec).padStart(2,'0') + 's' : sec + 's';
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function fmtSession(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return h + 'h ' + (m % 60) + 'm';
+  return m + ':' + String(s % 60).padStart(2,'0');
+}
+
+function vibrate(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
+}
+
+function handleTap(e) {
+  if (e.type === 'touchstart') e.preventDefault();
+  if (e.type === 'touchstart' && e.changedTouches) {
+    addRipple(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  } else if (e.clientX) {
+    addRipple(e.clientX, e.clientY);
+  }
+
+  if (activeStart === null) {
+    activeStart = Date.now();
+    if (!sessionStart) { sessionStart = activeStart; save(); startSessionTimer(); }
+    elapsed = 0;
+    vibrate([30]);
+    const btn = document.getElementById('tapBtn');
+    btn.classList.add('active');
+    document.getElementById('btnMain').style.display = 'none';
+    document.getElementById('btnLive').style.display = 'block';
+    document.getElementById('btnLive').textContent = '0s';
+    document.getElementById('btnSub').textContent = 'tap when contraction ends';
+    document.getElementById('breatheBar').style.display = 'flex';
+    liveTimer = setInterval(() => {
+      elapsed = Date.now() - activeStart;
+      const s = Math.round(elapsed / 1000);
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      document.getElementById('btnLive').textContent = m > 0 ? m + 'm ' + String(sec).padStart(2,'0') + 's' : sec + 's';
+    }, 500);
+  } else {
+    const end = Date.now();
+    const duration = end - activeStart;
+    if (duration < 3000) { return; }
+    const prev = contractions.length > 0 ? contractions[contractions.length - 1] : null;
+    const interval = prev ? (activeStart - prev.start) : null;
+    contractions.push({ start: activeStart, end, duration, interval });
+    save();
+    clearInterval(liveTimer);
+    activeStart = null;
+    vibrate([30, 30, 60]);
+    const btn = document.getElementById('tapBtn');
+    btn.classList.remove('active');
+    document.getElementById('btnLive').style.display = 'none';
+    document.getElementById('btnMain').style.display = 'block';
+    document.getElementById('btnMain').textContent = 'Tap to start';
+    document.getElementById('btnSub').textContent = 'tap when next contraction begins';
+    document.getElementById('breatheBar').style.display = 'none';
+    document.getElementById('undoBtn').style.display = 'inline-block';
+    updateStats();
+    renderLog();
+    updatePhase();
+    check511();
+  }
+}
+
+function addRipple(cx, cy) {
+  const btn = document.getElementById('tapBtn');
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  const r = document.createElement('div');
+  r.className = 'ripple';
+  r.style.cssText = `width:${size}px;height:${size}px;left:${cx-rect.left-size/2}px;top:${cy-rect.top-size/2}px;`;
+  btn.appendChild(r);
+  setTimeout(() => r.remove(), 600);
+}
+
+function undoLast() {
+  if (contractions.length === 0) return;
+  contractions.pop();
+  save();
+  updateStats();
+  renderLog();
+  updatePhase();
+  check511();
+  if (contractions.length === 0) {
+    document.getElementById('undoBtn').style.display = 'none';
+    document.getElementById('alert511').style.display = 'none';
+    document.getElementById('phaseBar').style.display = 'none';
+  }
+}
+
+function updateStats() {
+  const c = contractions;
+  if (c.length === 0) {
+    ['lastDur','lastInt','avgDur','avgInt'].forEach(id => {
+      const el = document.getElementById(id);
+      el.textContent = '—'; el.className = 'stat-val dim';
+    });
+    return;
+  }
+  const last = c[c.length - 1];
+  document.getElementById('lastDur').textContent = fmt(last.duration);
+  document.getElementById('lastDur').className = 'stat-val';
+  document.getElementById('lastInt').textContent = last.interval != null ? fmt(last.interval) : '—';
+  document.getElementById('lastInt').className = 'stat-val' + (last.interval && last.interval <= 360000 ? '' : ' dim');
+
+  const durs = c.map(x => x.duration);
+  const avgD = durs.reduce((a,b)=>a+b,0)/durs.length;
+  document.getElementById('avgDur').textContent = fmt(avgD);
+  document.getElementById('avgDur').className = 'stat-val';
+
+  const ints = c.filter(x=>x.interval!=null).map(x=>x.interval);
+  if (ints.length > 0) {
+    const avgI = ints.reduce((a,b)=>a+b,0)/ints.length;
+    document.getElementById('avgInt').textContent = fmt(avgI);
+    document.getElementById('avgInt').className = 'stat-val';
+  }
+}
+
+function updatePhase() {
+  const c = contractions;
+  const bar = document.getElementById('phaseBar');
+  if (c.length < 2) { bar.style.display = 'none'; return; }
+  const recent = c.slice(-4);
+  const ints = recent.filter(x=>x.interval!=null).map(x=>x.interval);
+  const durs = recent.map(x=>x.duration);
+  if (!ints.length) return;
+  const avgI = ints.reduce((a,b)=>a+b,0)/ints.length;
+  const avgD = durs.reduce((a,b)=>a+b,0)/durs.length;
+  bar.style.display = 'flex';
+  const dot = document.getElementById('phaseDot');
+  const pt = document.getElementById('phaseText');
+  const ps = document.getElementById('phaseSub');
+  if (avgI > 600000) {
+    dot.style.background = '#5e9bc9'; pt.textContent = 'Early labour';
+    ps.textContent = 'Contractions irregular or > 10 min apart — rest if you can';
+  } else if (avgI > 300000) {
+    dot.style.background = '#f0c04a'; pt.textContent = 'Active labour likely beginning';
+    ps.textContent = 'Contractions 5–10 min apart — track closely';
+  } else if (avgI <= 300000 && avgD >= 45000) {
+    dot.style.background = '#e8739a'; pt.textContent = 'Active labour';
+    ps.textContent = 'Contractions ≤5 min, lasting 45s+ — consider calling your midwife';
+  } else {
+    dot.style.background = '#888'; pt.textContent = 'Tracking...';
+    ps.textContent = 'Keep timing';
+  }
+}
+
+function check511() {
+  const c = contractions;
+  const alert = document.getElementById('alert511');
+  if (c.length < 6) { alert.style.display = 'none'; return; }
+  const recent = c.slice(-8);
+  const durs = recent.map(x=>x.duration);
+  const avgD = durs.reduce((a,b)=>a+b,0)/durs.length;
+  const ints = recent.filter(x=>x.interval!=null).map(x=>x.interval);
+  if (ints.length < 3) return;
+  const avgI = ints.reduce((a,b)=>a+b,0)/ints.length;
+  const spanMs = recent[recent.length-1].end - recent[0].start;
+  if (avgD >= 50000 && avgI <= 360000 && spanMs >= 3600000) {
+    alert.style.display = 'block';
+  } else {
+    alert.style.display = 'none';
+  }
+}
+
+function renderLog() {
+  const list = document.getElementById('logList');
+  const n = contractions.length;
+  document.getElementById('cCount').textContent = n > 0 ? `(${n})` : '';
+  if (n === 0) {
+    list.innerHTML = '<div id="empty">No contractions yet.<br>Tap the button above when one starts.</div>';
+    return;
+  }
+  list.innerHTML = [...contractions].reverse().map((c, i) => {
+    const num = n - i;
+    const durClass = c.duration >= 50000 ? 'log-dur warn' : 'log-dur';
+    const intClass = c.interval && c.interval <= 360000 ? 'log-int close' : (c.interval ? 'log-int' : 'log-int dim');
+    return `<div class="log-row">
+      <span class="log-num">${num}</span>
+      <span class="log-time">${fmtTime(c.start)}</span>
+      <span class="${durClass}">${fmt(c.duration)}</span>
+      <span class="${intClass}">${c.interval != null ? fmt(c.interval) : '—'}</span>
+    </div>`;
+  }).join('');
+}
+
+function startSessionTimer() {
+  sessionTimer = setInterval(() => {
+    if (!sessionStart) return;
+    const ms = Date.now() - sessionStart;
+    const n = contractions.length;
+    document.getElementById('sessionInfo').textContent =
+      'Session: ' + fmtSession(ms) + '  |  ' + n + ' contraction' + (n !== 1 ? 's' : '');
+  }, 1000);
+}
+
+function clearAll() {
+  if (!confirm('Clear all contractions?')) return;
+  contractions = [];
+  sessionStart = null;
+  clearInterval(sessionTimer);
+  try { localStorage.removeItem('contractions_v2'); localStorage.removeItem('session_start'); } catch(e) {}
+  document.getElementById('alert511').style.display = 'none';
+  document.getElementById('phaseBar').style.display = 'none';
+  document.getElementById('undoBtn').style.display = 'none';
+  document.getElementById('sessionInfo').textContent = 'Session: 0:00  |  0 contractions';
+  updateStats();
+  renderLog();
+}
+
+function toggleLight() {
+  document.body.classList.toggle('light');
+  document.getElementById('darkToggle').textContent = document.body.classList.contains('light') ? 'Dark' : 'Light';
+  try { localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark'); } catch(e) {}
+}
+
+function openExport() {
+  const c = contractions;
+  if (c.length === 0) { alert('No contractions logged yet.'); return; }
+  const durs = c.map(x=>x.duration);
+  const avgD = durs.reduce((a,b)=>a+b,0)/durs.length;
+  const ints = c.filter(x=>x.interval!=null).map(x=>x.interval);
+  const avgI = ints.length ? ints.reduce((a,b)=>a+b,0)/ints.length : null;
+  const spanMs = c[c.length-1].end - c[0].start;
+  let text = 'CONTRACTION LOG\n';
+  text += 'Generated: ' + new Date().toLocaleString() + '\n\n';
+  text += 'Summary\n';
+  text += '  Total contractions: ' + c.length + '\n';
+  text += '  Session duration:   ' + fmtSession(spanMs) + '\n';
+  text += '  Avg duration:       ' + fmt(avgD) + '\n';
+  text += '  Avg interval:       ' + (avgI ? fmt(avgI) : '—') + '\n\n';
+  text += '#   Time          Duration   Interval\n';
+  text += '─'.repeat(42) + '\n';
+  c.forEach((ct, i) => {
+    const num = String(i+1).padStart(2,' ');
+    const t = fmtTime(ct.start).padEnd(14,' ');
+    const d = fmt(ct.duration).padEnd(10,' ');
+    const iv = ct.interval ? fmt(ct.interval) : '—';
+    text += num + '  ' + t + d + iv + '\n';
+  });
+  document.getElementById('exportText').value = text;
+  document.getElementById('exportOverlay').classList.add('show');
+}
+
+function copyExport() {
+  const t = document.getElementById('exportText');
+  t.select();
+  try {
+    navigator.clipboard.writeText(t.value).then(() => {
+      document.getElementById('copyBtn').textContent = 'Copied!';
+      setTimeout(() => document.getElementById('copyBtn').textContent = 'Copy to clipboard', 2000);
+    });
+  } catch(e) {
+    document.execCommand('copy');
+    document.getElementById('copyBtn').textContent = 'Copied!';
+    setTimeout(() => document.getElementById('copyBtn').textContent = 'Copy to clipboard', 2000);
+  }
+}
+
+function closeExportModal() {
+  document.getElementById('exportOverlay').classList.remove('show');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.activeElement.tagName !== 'BUTTON') {
+    e.preventDefault();
+    handleTap({ type: 'click', clientX: 0, clientY: 0 });
+  }
+});
+
+loadSaved();
+renderLog();
+updateStats();
+updatePhase();
+check511();
+if (contractions.length > 0) {
+  document.getElementById('undoBtn').style.display = 'inline-block';
+  if (!sessionStart) sessionStart = contractions[0].start;
+  startSessionTimer();
+}
+try {
+  if (localStorage.getItem('theme') === 'light') { document.body.classList.add('light'); document.getElementById('darkToggle').textContent = 'Dark'; }
+} catch(e) {}
+</script>
+</body>
+</html>
